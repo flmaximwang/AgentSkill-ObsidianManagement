@@ -57,6 +57,10 @@ def build_fixture(root: Path, container: str = "database") -> Path:
     T = root / "Vault" / "People"
     (T / "template").mkdir(parents=True)
     (T / "template" / "t.md").write_text("template, must not move", "utf-8")
+    # prose/CLI text that merely contains the container name must not be reported as a
+    # vault reference (Rosetta's -database flag, server paths like /root/public_databases)
+    (T / "template" / "prose.md").write_text(
+        'Option "database" is a Path type option.\nserver: "/root/public_databases"\n', "utf-8")
     (T / "People.md").write_text("folder note", "utf-8")
     (T / "README.md").write_text("readme", "utf-8")
     (T / "People.base").write_text('filters: file.folder == "People/%s"' % container, "utf-8")
@@ -132,6 +136,8 @@ def main() -> int:
               any(m["src"].endswith("Buried.md") for m in plan["moves"]), True)
         check("view referencing the dissolved folder is flagged",
               any("People.base" in r for r in plan["path_references"]), True)
+        check("prose/CLI text containing the container name is NOT flagged",
+              any("prose.md" in r or "public_databases" in r for r in plan["path_references"]), False)
         check("excalidraw rides along with its single embedder",
               plan["counts"]["excalidraw_attachments"], 1)
         check("preserved template/ untouched",

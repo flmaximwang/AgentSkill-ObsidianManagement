@@ -523,11 +523,26 @@ def git_preflight(target: Path, require_clean: bool) -> dict:
     return out
 
 
+VIEW_HINT_RE = re.compile(
+    r"file\.(folder|path|name|link|ext)|^\s*from\b|\bwhere\b|\bfolder\b|startsWith|contains\(|dataview|dv\.",
+    re.I | re.M)
+
+
+def _path_component_match(needle: str, quoted: str) -> bool:
+    """A folder is referenced only when the needle is a whole path segment.
+
+    "database" must not match "/root/public_databases" - that is a server path.
+    """
+    return any(seg == needle for seg in quoted.split("/"))
+
+
 def path_reference_scan(target: Path, dissolved: list[str]) -> list[str]:
     """Views (.base) / dataview queries that hardcode a path which is about to vanish.
 
     ``dissolved`` are the intermediate folders that disappear because their content
     is hoisted up. No folder name is assumed - whatever exists gets checked.
+    A bare word is not a reference: a quoted string only counts when it is a whole
+    path segment AND either the file is a .base view or the line is a query line.
     """
     hits: list[str] = []
     if not dissolved:
@@ -546,7 +561,10 @@ def path_reference_scan(target: Path, dissolved: list[str]) -> list[str]:
             if not any(n in text for n in needles):
                 continue
             for m in QUOTED_RE.finditer(text):
-                if any(n in m.group(1) for n in needles):
+                if not any(_path_component_match(n, m.group(1)) for n in needles):
+                    continue
+                line = text[text.rfind("\n", 0, m.start()) + 1:text.find("\n", m.end())]
+                if f.endswith(".base") or VIEW_HINT_RE.search(line):
                     hits.append("%s -> \"%s\"" % (p.relative_to(target), m.group(1)))
                     break
             if len(hits) >= 12:
