@@ -262,6 +262,11 @@ def main() -> int:
         check("settles within 4 passes", counts[-1], 0)
         check("every note ends up in a folder of its own name", structural_violations(T), [])
         check("a settled tree proposes no work", counts[-1], 0)
+        settled_plan = plan_of(root)[0]
+        check("a settled tree reports no false leftovers (only genuinely unplaced files)",
+              [x for x in settled_plan["leftovers"] if not x.endswith(".base")], [])
+        check("our own .index markers are not reported as dot-file noise",
+              [x for x in settled_plan["noise"] if ".index." in x], [])
 
     print()
     if FAILED:

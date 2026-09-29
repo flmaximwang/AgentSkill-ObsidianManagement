@@ -69,6 +69,7 @@ WINDOWS_RESERVED = {"CON", "PRN", "AUX", "NUL",
 ILLEGAL_FS = set('\\/:*?"<>|')
 EMBED_RE = re.compile(r"!\[\[([^\]|#]+)|!\[[^\]]*\]\(([^)]+)\)")
 QUOTED_RE = re.compile(r"""["']([^"']{2,200})["']""")
+INDEX_MARKER_RE = re.compile(r"^\.index\.\d+$")   # the tool's own marker, not user noise
 
 PRESERVE: set[str] = set()
 
@@ -433,6 +434,8 @@ def scan(target: Path, preserve: set[str], py: Pinyin):
         if any(par in own_dirs for par in f.parents):
             continue
         if f.name.startswith("."):
+            if INDEX_MARKER_RE.match(f.name):
+                continue        # our own index marker: re-running must not report it as noise
             noise.append(f)
             continue
         host = attribute(f)
@@ -594,6 +597,7 @@ def build_plan(target: Path, args, py: Pinyin, plan_path: Path) -> dict:
                     u.skip = True
 
     moves: list[tuple[str, str]] = []
+    settled: set[str] = set()      # src == dst: already organized, not a "leftover"
     dirs_needed: set[str] = set()
     index_files: dict[str, str] = {}
     unit_rows = []
@@ -617,7 +621,8 @@ def build_plan(target: Path, args, py: Pinyin, plan_path: Path) -> dict:
             rows += [(p, dst_dir / p.name) for p in u.carry]
             for src, dst in rows:
                 if str(src) == str(dst):
-                    continue          # already in place: re-running must change nothing
+                    settled.add(str(src))   # already in place: re-running must change nothing
+                    continue
                 moves.append((str(src), str(dst)))
             longest.append([str(dst_dir / (u.name + ".md")), len(str(dst_dir / (u.name + ".md")))])
             unit_rows.append({"name": u.name, "key": u.key, "chain": list(chain),
@@ -645,8 +650,29 @@ def build_plan(target: Path, args, py: Pinyin, plan_path: Path) -> dict:
     def is_moved(p: Path) -> bool:
         return any(p == m or m in p.parents for m in moved_paths)
 
+    # already-organized trees: a file under a real index bucket is in place, not a leftover.
+    # The target root itself carries .index.1: it must not seed the cascade, or every
+    # child directory would count as "bucketed" and genuine leftovers would be hidden.
+    bucketed: set[Path] = set()
+    for dp, _dn, fn in os.walk(target):
+        d = Path(dp)
+        if d == target:
+            continue
+        if d.parent in bucketed or any(INDEX_MARKER_RE.match(x) for x in fn):
+            bucketed.add(d)
+
+    def is_under_bucket(p: Path) -> bool:
+        return any(a in bucketed for a in p.parents)
+
+    def in_preserved(p: Path) -> bool:
+        return any(part in PRESERVE for part in p.relative_to(target).parts)
+
+    def is_ours(p: Path) -> bool:
+        return bool(INDEX_MARKER_RE.match(p.name))
+
     leftovers = sorted(str(p.relative_to(target)) for p in all_files
-                       if p.parent != target and not is_moved(p))
+                       if p.parent != target and not is_moved(p) and str(p) not in settled
+                       and not is_under_bucket(p) and not in_preserved(p) and not is_ours(p))
     orphans = [o for o in orphans
                if any(o == target / l or o in (target / l).parents for l in leftovers)]
 
