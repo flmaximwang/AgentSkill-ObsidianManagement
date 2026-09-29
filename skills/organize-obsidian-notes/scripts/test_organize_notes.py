@@ -74,6 +74,7 @@ def build_fixture(root: Path, container: str = "database") -> Path:
     for i in range(1, 4):                       # 3 more -> a level-2 sibling bucket
         (db / ("Ab%02d.md" % i)).write_text("m%d" % i, "utf-8")
     (db / "王小明.md").write_text("cjk", "utf-8")
+    (db / "重链假说.md").write_text("polyphone: 重 reads zhong here, not chong", "utf-8")
     return T.resolve()
 
 
@@ -113,15 +114,20 @@ def main() -> int:
               sorted(k for k in leaves if k.startswith("A/A")),
               ["A/AA/AA0", "A/AA/AA1", "A/AA/AA2", "A/AB", "A/AH"])
         check("all buckets within limit", max(leaves.values()) <= plan["limit"], True)
-        check("other buckets", sorted(k for k in leaves if not k.startswith("A")), ["B", "W"])
+        check("other buckets", sorted(k for k in leaves if not k.startswith("A")), ["B", "W", "Z"])
         cjk = "W" if plan["pinyin_backend"] != "codepoint" else "_"
         check("CJK -> %s (%s backend)" % (cjk, plan["pinyin_backend"]), cjk in leaves, True)
+        check("polyphone first characters are surfaced for review",
+              [(p["name"], p["bucket"]) for p in plan["polyphone_review"]],
+              [("重链假说", "Z")])
+        check("an unambiguous CJK note is not flagged",
+              any(p["name"] == "王小明" for p in plan["polyphone_review"]), False)
         check("folder's own note is never bucketed", "P" in leaves, False)
         idx = {Path(p).relative_to(T).as_posix() for p, _ in plan["index_files"]}
         check("index marker on every level of every chain", idx,
               {".index.1", "A/.index.1", "A/AA/.index.2", "A/AA/AA0/.index.3",
                "A/AA/AA1/.index.3", "A/AA/AA2/.index.3", "A/AB/.index.2", "A/AH/.index.2",
-               "B/.index.1", "W/.index.1"})
+               "B/.index.1", "W/.index.1", "Z/.index.1"})
         check("no folder name is hard-coded",
               any(m["src"].endswith("Buried.md") for m in plan["moves"]), True)
         check("view referencing the dissolved folder is flagged",

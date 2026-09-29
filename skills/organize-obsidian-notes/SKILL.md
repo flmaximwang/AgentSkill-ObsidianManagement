@@ -43,7 +43,7 @@ Target/
   `.pdf/.pdb/.json/.zip` 等文件 git 找不回，只有计划 JSON 是撤消依据。确认可以继续时加 `--allow-dirty`。
 
 - **Step 2 · 读计划。** 🔴 **CHECKPOINT：必须把计划摘要展示给用户并得到确认，才能进 Step 3。**
-  报告里逐条确认：`notes`（条数）、`moves`、`leaf buckets`、`fullest buckets`、`stays put`，以及**所有 `[!]` 行**。
+  报告里逐条确认：`notes`（条数）、`moves`、`leaf buckets`、`fullest buckets`、`stays put`、`polyphone`（多音字待核），以及**所有 `[!]` 行**。
   退出码 **0** = 无致命问题；**3** = 计划不可执行（见「失败模式」）。
 
 - **Step 3 · 执行。** 🔴 **CHECKPOINT：只有用户确认后才加 `--apply`。**
@@ -68,7 +68,7 @@ Target/
 | 铺平 | 每个 `.md` 移入「与其同名的父文件夹」；没有就建一个 |
 | 索引桶 | 按排序键的第 n 个字符分桶，桶名 = 累积前缀（`A/AB/ABC`）；桶内 > `--limit`（默认 26）则继续下一字符 |
 | 排序键 | 大小写归一 → 去除非字母数字 → 真拼音（`打孔蛋白→DAKONGDANBAI`）；`🧩 Actin (family)→ACTINFAMILY`、`α-synuclein→ASYNUCLEIN` |
-| 多音字 | 首字符是多音字且与 ICU 读音可疑的记入报告 `polyphone-review`，**不自动改**（240 条 CJK 名实测 3 条：重/仇） |
+| 多音字 | 首字符属于「两种读法首字母不同」的字表（重/仇/单/曾/解/查/区/乐/种/秘/繁/长/会/折/尉/覃）时，记入计划的 `polyphone_review` 字段并打印，**不自动改**。实测 `(MEMOS) Genes & Proteins`（745 条笔记）标出 5 条，其中 `重组表达…` 两条 ICU 取 zhòng→Z 而实际应 chóng→C |
 | `.index.<n>` | 每个索引层一个标记文件，内容为层级号（`--index-content empty` 改零字节） |
 | 附件跟随 | ① 名为 `X_assets/` 的目录归 `X`；② 目录内文件都被**同一条**笔记引用时归该笔记；③ 否则归最近的上层同名文件夹；都不满足 → 留原地并列 `stays put` |
 | `.excalidraw.md` | 仅被一条笔记 `![[]]` 嵌入时当附件随行；被多条嵌入或无人嵌入则当普通笔记 |
@@ -112,7 +112,7 @@ Target/
 |---|---|
 | `scripts/organize_notes.py` | 主程序：扫描 → 计划 → 校验 → apply / rollback。默认 dry run |
 | `scripts/organize.sh` | 一行启动器：自动挑解释器并跑 dry run 摘要（`./organize.sh <target> [apply]`） |
-| `scripts/test_organize_notes.py` | 63 项断言自检，无需 pytest |
+| `scripts/test_organize_notes.py` | 65 项断言自检，无需 pytest |
 | `test-prompts.json` | 三个典型请求 + 期望产物（用于评测本 skill） |
 
 ```bash
@@ -120,12 +120,21 @@ python3 scripts/organize_notes.py --selftest                      # 本机能力
 python3 scripts/organize_notes.py "<target>" --report plan.json   # dry run
 python3 scripts/organize_notes.py "<target>" --apply --on-collision skip --report plan.json
 python3 scripts/organize_notes.py --rollback plan.json
-python3 scripts/test_organize_notes.py                            # 63 项自检
+python3 scripts/test_organize_notes.py                            # 65 项自检
 ```
 
 退出码：`0` 干净 ｜ `1` 已执行但有 verify 告警 ｜ `2` 预检/用法错误 ｜ `3` 计划有致命问题（未执行）｜ `4` 执行中途失败。
 
 ## 实测数据（999 笔记子树，2026-09-30，macOS 26.6.2 / Python 3.12.9）
+
+被测目标是真实 vault 的 `wangfanlin1_Knowledge/🗂️ Classifications/T/TP/TP3/TP31/TP317 程序包（应用软件）`，
+`cp -R` 一份副本后在副本上 `--apply`（真实库只跑 dry run）。复现：
+
+```bash
+cp -R "<该文件夹>" /tmp/tp317 && git -C /tmp init -q && git -C /tmp add -A && git -C /tmp commit -qm x
+python3 scripts/organize_notes.py /tmp/tp317 --apply --on-collision skip   # 三遍直到无 pass 2 提示
+python3 scripts/organize_notes.py --rollback <plan.json>                   # 逆序，逐份回滚
+```
 
 | 指标 | 整理前 | 整理后 |
 |---|---|---|
@@ -136,5 +145,5 @@ python3 scripts/test_organize_notes.py                            # 63 项自检
 | 回滚 | — | 逆序回滚 3 份计划后 `git status` 为空，逐字节还原 |
 
 未达标项（诚实记录）：`O/OB/OBS/OBSI/OBSID/OBSIDI/OBSIDIA/OBSIDIAN` 仍 79 条——它们是 `(Obsidian) …` /
-`Obsidian …` 一族，共享 8 字符前缀，字母索引在不把路径拉得更长的前提下分不开。解药是改名或提高
-`--max-level`，不是继续加层。
+`Obsidian …` 一族，共享 8 字符前缀，字母索引在不把路径拉得更长的前提下分不开。把 `--max-level` 放到 12
+实测能让该桶从 79 降到 42，但桶路径前缀涨到 90 字符且仍未达标，故默认停在 8：解药是改名，不是继续加层。

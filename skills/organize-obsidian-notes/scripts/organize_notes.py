@@ -54,6 +54,15 @@ DEF_MAX_PATH = 240    # chars; Windows MAX_PATH = 260 incl. drive letter + NUL
 DEF_PRESERVE = "template,templates,data,assets,Scripts,.obsidian,.git,.trash"
 ROOT_KEEP = {"README.md", "index.md"}          # stay at the target root
 MAX_LEVEL = 8                                   # index levels per chain; see --max-level
+# First characters with more than one reading, where the readings start with DIFFERENT
+# letters - so the pinyin reading decides the bucket. ICU picks one; only a human knows
+# which one the note means. Reported for review, never rewritten automatically.
+POLYPHONE = {
+    "重": "chóng/zhòng", "仇": "qiú(姓)/chóu", "单": "shàn(姓)/dān", "曾": "zēng(姓)/céng",
+    "解": "xiè(姓)/jiě", "查": "zhā(姓)/chá", "区": "ōu(姓)/qū", "乐": "yuè/lè",
+    "种": "chóng(姓)/zhǒng", "秘": "bì(秘鲁)/mì", "繁": "pó(姓)/fán", "长": "cháng/zhǎng",
+    "会": "kuài(会计)/huì", "折": "shé/zhé", "尉": "yù(姓)/wèi", "覃": "qín(姓)/tán",
+}
 WINDOWS_RESERVED = {"CON", "PRN", "AUX", "NUL",
                     *{"COM%d" % i for i in range(1, 10)},
                     *{"LPT%d" % i for i in range(1, 10)}}
@@ -600,6 +609,16 @@ def build_plan(target: Path, args, py: Pinyin, plan_path: Path) -> dict:
     if leaves:
         index_files[str(target / ".index.1")] = "1"
 
+    # first characters with more than one reading: the bucket depends on which reading the
+    # note means, and no script can know that. Surface them instead of guessing silently.
+    polyphone = []
+    for u in sorted(units.values(), key=lambda u: u.name):
+        ch = u.name[0] if u.name else ""
+        if ch in POLYPHONE:
+            polyphone.append({"name": u.name, "char": ch, "readings": POLYPHONE[ch],
+                              "bucket": "/".join(u.chain) if u.chain else "(left in place)",
+                              "src_md": str(u.md)})
+
     # what stays put: collision-skipped notes, unattributable attachments, root files.
     # Containers that end up empty are dissolved, so only report the ones still holding
     # something nobody claimed.
@@ -654,6 +673,11 @@ def build_plan(target: Path, args, py: Pinyin, plan_path: Path) -> dict:
     if leftovers:
         warnings.append("%d file(s) will not move (collision-skipped or unattributable); "
                         "see 'leftovers' in the plan" % len(leftovers))
+    if polyphone:
+        warnings.append("%d note(s) start with a character that has two readings (%s); the "
+                        "reading decides the bucket, so check these by hand: %s"
+                        % (len(polyphone), ", ".join(sorted({p["char"] for p in polyphone})),
+                           ", ".join(p["name"] for p in polyphone[:3])))
     deep = sorted({k for k in leaves if len(k) > 4})
     if deep:
         warnings.append("%d bucket chain(s) reach deeper than 4 index levels (deepest %s); "
@@ -719,6 +743,7 @@ def build_plan(target: Path, args, py: Pinyin, plan_path: Path) -> dict:
             "paths_over_max": over,
         },
         "warnings": warnings,
+        "polyphone_review": polyphone,
         "git": git_preflight(target, not args.allow_dirty),
     }
 
@@ -861,6 +886,12 @@ def print_report(plan: dict, plan_path: Path) -> None:
                                             plan["collisions"][0]["name"]))
     for w in plan["warnings"]:
         print("  [!] %s" % w)
+    if plan.get("polyphone_review"):
+        poly = plan["polyphone_review"]
+        print("polyphone      : %d note(s) need a human check before applying" % len(poly))
+        for p in poly[:5]:
+            print("    %-34s -> bucket %-10s (%s 可读 %s)"
+                  % (p["name"][:34], p["bucket"], p["char"], p["readings"]))
     if plan["leftovers"]:
         print("  stays put      : %d file(s)  e.g. %s"
               % (len(plan["leftovers"]), ", ".join(plan["leftovers"][:4])))
