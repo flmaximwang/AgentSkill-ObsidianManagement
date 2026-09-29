@@ -898,7 +898,14 @@ def print_report(plan: dict, plan_path: Path) -> None:
     print("plan written   : %s" % plan_path)
     if plan["mode"] == "dry_run":
         print("\nDRY RUN - nothing on disk was touched.")
-        print("  apply   : python3 %s \"%s\" --apply" % (PROG, plan["target"]))
+        # the hint must be runnable verbatim: without the collision flag it would exit 3 again
+        flags = []
+        if plan["collisions"]:
+            flags.append("--on-collision skip")
+        if plan["git"]["verdict"] in ("dirty-warn", "dirty-abort"):
+            flags.append("--allow-dirty")
+        print("  apply   : python3 %s \"%s\" --apply%s"
+              % (PROG, plan["target"], "".join(" " + f for f in flags)))
         print("  discard : rm %s" % plan_path)
 
 

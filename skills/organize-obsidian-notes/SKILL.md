@@ -73,7 +73,7 @@ Target/
 | 附件跟随 | ① 名为 `X_assets/` 的目录归 `X`；② 目录内文件都被**同一条**笔记引用时归该笔记；③ 否则归最近的上层同名文件夹；都不满足 → 留原地并列 `stays put` |
 | `.excalidraw.md` | 仅被一条笔记 `![[]]` 嵌入时当附件随行；被多条嵌入或无人嵌入则当普通笔记 |
 | 容器 | 含笔记的容器只铺平、绝不整体跟随单条笔记；抽空的容器自动溶解 |
-| 不进入 | `--preserve` 列出的目录（默认 `template,templates,data,assets,Scripts,.obsidian,.git,.trash`）整体跳过 |
+| 不进入 | `--preserve` 列出的目录（默认 `template,templates,data,assets,Scripts,.obsidian,.git,.trash`）整体跳过。实测 `👔 People` 里两个 `.excalidraw.md` 都在 `assets/` 下，故原地不动；`![[文件名.excalidraw]]` 按文件名解析，嵌入不受影响 |
 | 根目录保留 | `README.md`、`index.md`、同名文件夹笔记（`Target/Target.md`）不动 |
 
 ## 失败模式与一线修复

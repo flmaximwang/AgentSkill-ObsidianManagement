@@ -192,6 +192,9 @@ def main() -> int:
         run([str(T), "--pinyin", "codepoint"], cwd=root)
         plan, _ = plan_of(root)
         check("collision detected", len(plan["collisions"]), 1)
+        r_hint = run([str(T), "--pinyin", "codepoint"], cwd=root)
+        check("apply hint carries the flags the plan needs (would exit 3 without them)",
+              "--on-collision skip" in r_hint.stdout, True)
         check("codepoint fallback flags itself",
               any("no pinyin backend" in w for w in plan["warnings"]), True)
         check("default aborts the apply",
