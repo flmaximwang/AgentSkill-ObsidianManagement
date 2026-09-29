@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "prompt": "帮我把 /Users/maxim/Documents/Obsidian/wangfanlin1_Knowledge/💾 Database 这个文件夹里的笔记铺平，太深了，Windows 上路径会超长。",
+    "expected": "先跑 dry run（不写盘）并展示计划摘要；报告条数/moves/桶分布/stays put/[!] 行；指出目标若在 git 仓库且不干净会拒绝执行，询问是否 --allow-dirty；等用户确认后才 --apply；给出回滚命令。"
+  },
+  {
+    "id": 2,
+    "prompt": "我有一堆中文名的笔记，按拼音分桶是不是要装 pypinyin？",
+    "expected": "回答 macOS 自带 ICU（osascript -l JavaScript）即可得到真拼音（王小明→WANGXIAOMING→W），pypinyin 只是 Linux/Windows 的可选项；给出 --selftest 的实际输出证明分桶；说明没有后端时降级为码位序并显式警告。不得含糊其辞或声称必须先装依赖。"
+  },
+  {
+    "id": 3,
+    "prompt": "上次那个整理脚本跑完我发现有些笔记没进桶，还有几个 .base 文件打不开了，怎么回事？",
+    "expected": "区分三类未移动项（撞名跳过、无人认领的遗留文件、--preserve 目录）并给出在计划 JSON 里的字段（leftovers / collisions / stays put）；说明 .base/.canvas 引用被溶解文件夹时报告 path_references 会列出并需要手改；给出继续收敛的第二步（pass 2 提示）与回滚命令。不臆造原因。"
+  }
+]
