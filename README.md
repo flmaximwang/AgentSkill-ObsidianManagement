@@ -22,7 +22,7 @@ Obsidian vault 维护类 skill 的合集。每个 skill 自带**可执行脚本 
 for s in organize-obsidian-notes book-to-quiz obsidian-article-atomization \
          obsidian-qa-discussion obsidian-bases obsidian-snippet \
          obsidian-theme-development obsidian-vault-bulk-move vault-math-notation; do
-  hermes skills install "flmaximwang/AgentSkill-ObsidianManagement/skills/$s" --category note-taking -y
+  hermes skills install "flmaximwang/AgentSkill-ObsidianManagement/skills/$s" --category obsidian -y
 done
 ```
 
