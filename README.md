@@ -7,6 +7,7 @@ Obsidian vault 维护类 skill 的合集。每个 skill 自带**可执行脚本 
 | skill | 用途 | 可执行入口 |
 |---|---|---|
 | [organize-obsidian-notes](skills/organize-obsidian-notes/SKILL.md) | 成百上千条嵌套笔记 → 「同名父文件夹 + 字母索引桶」 | `scripts/organize_notes.py`、`organize.sh`、`test_organize_notes.py` |
+| [notes-subtree-extraction](skills/notes-subtree-extraction/SKILL.md) | 笔记子树 → **新的 git 仓库**（跨仓库迁移 + 链接完整性 + 源历史清理） | `references/subtree-to-new-vault.md`、`references/history-purge-filter-repo.md` |
 | [book-to-quiz](skills/book-to-quiz/SKILL.md) | 知识书 / 长文档 → vault 里的习题集（+ 答案册） | `scripts/export_answer_book.py` |
 | [obsidian-article-atomization](skills/obsidian-article-atomization/SKILL.md) | 外部文章 → 多个原子笔记，并接入已有笔记图谱 | `scripts/verify_wikilinks.py` |
 | [obsidian-qa-discussion](skills/obsidian-qa-discussion/SKILL.md) | 多轮技术问答讨论 → 结构化 vault 笔记（两种格式分支） | `scripts/verify-note-edit.py` |
@@ -15,13 +16,16 @@ Obsidian vault 维护类 skill 的合集。每个 skill 自带**可执行脚本 
 | [obsidian-theme-development](skills/obsidian-theme-development/SKILL.md) | Workbench 主题的样式 / 打印 / 发布维护 | `scripts/cdp.py` |
 | [obsidian-vault-bulk-move](skills/obsidian-vault-bulk-move/SKILL.md) | git vault 里成百上千个文件夹的重排 | —（顺序本身即安全保证，见正文） |
 | [vault-math-notation](skills/vault-math-notation/SKILL.md) | vault 笔记里的数学 / 晶体学 / 化学记号约定 | —（约定，强制用户偏好） |
+| [obsidian-entity-notes](skills/obsidian-entity-notes/SKILL.md) | 单主题实体笔记（蛋白家族 / 化合物 / 数据库）的落位与写作规范 | `scripts/verify_note.py` |
+| [obsidian-howto-notes](skills/obsidian-howto-notes/SKILL.md) | 工具 how-to / 文档笔记的骨架与提交规范 | —（纯流程） |
 
 装进 Hermes（三段式标识符，按仓库内路径，**不需要 tap**；`--category` 只决定落点）：
 
 ```bash
-for s in organize-obsidian-notes book-to-quiz obsidian-article-atomization \
-         obsidian-qa-discussion obsidian-bases obsidian-snippet \
-         obsidian-theme-development obsidian-vault-bulk-move vault-math-notation; do
+for s in organize-obsidian-notes notes-subtree-extraction book-to-quiz \
+         obsidian-article-atomization obsidian-qa-discussion obsidian-bases \
+         obsidian-snippet obsidian-theme-development obsidian-vault-bulk-move \
+         vault-math-notation obsidian-entity-notes obsidian-howto-notes; do
   hermes skills install "flmaximwang/AgentSkill-ObsidianManagement/skills/$s" --category obsidian -y
 done
 ```
@@ -68,6 +72,26 @@ python3 scripts/test_organize_notes.py
 | 实测（999 笔记子树） | 最长路径 364 → 282 字符；186 桶中 185 桶 ≤ 26 条；1096 → 38 → 2 → 0 moves 收敛；逆序回滚后 `git status` 为空、逐字节还原 |
 
 细节、失败模式与反例清单见 [skills/organize-obsidian-notes/SKILL.md](skills/organize-obsidian-notes/SKILL.md)。
+
+## skills/notes-subtree-extraction
+
+把一个**笔记子树**从原 vault 搬进**新的 git 仓库**——跨仓库这一步，外加只有写进第二个仓库时才会踩的坑。
+与 `obsidian-vault-bulk-move` 的分工：那个管**仓内**重排，它的回滚 / ledger 机制在这里同样适用。
+
+顺序即安全保证：先勘察源与目标（README / `git log` / `git status`）→ **一次澄清**（源是移走还是复制、分桶键、
+二进制跟不跟走、目标是否独立 vault、remote/LFS）→ 分类只看路径 / 文件名 / frontmatter（**不读正文**）→
+在目标仓库里**按 pathspec 精确 add**（`git add -A` 会把用户未提交的改动卷进你的 commit）→
+源文件数（去掉 `.DS_Store` / `.trash`）与目标逐一相等后才允许删源 → 三条断言（无同名嵌套目录、NFC 规范化后
+tracked == on-disk、外链代价量化）→ 最后才清源历史。
+
+```bash
+# 源历史里抹掉已迁走的路径（必须在目标逐字节可证之后）
+git filter-repo --path <已迁走的路径> --invert-paths
+```
+
+分类配方、审计代码与报告格式见 [references/subtree-to-new-vault.md](skills/notes-subtree-extraction/references/subtree-to-new-vault.md)，
+源历史清理的完整 rehashing / 演练流程见
+[references/history-purge-filter-repo.md](skills/notes-subtree-extraction/references/history-purge-filter-repo.md)。
 
 ## skills/book-to-quiz
 
@@ -224,3 +248,40 @@ git ls-files -s -z -- <dir>               # 在 `git add -A` 之后跑
 （Obsidian 的 MathJax 自带，用户在**依赖它**——他亲手把一条笔记从 `K$_3$Fe(CN)$_6$` 改成 `$\ce{K3[Fe(CN)6]}$`），
 整物种包在 `$\ce{...}$` 里。晶体学符号、空间群表写法、陪集 / 商群那套解释框架（12 个例子的完整操作表参考），
 以及「什么时候才该写这些」的务实规则都在正文。
+
+## skills/obsidian-entity-notes
+
+**单主题实体笔记**（蛋白家族、蛋白概念、化学 / 大分子实体、生物信息数据库）的落位与写作规范，
+是 bundled `obsidian` skill 的配套（vault 路径解析、README-first 规则、多文件 explain-first 闸门仍在那边）。
+触发：「note this in my Obsidian」/「记到 vault 里」+ 单个主题；补全已有的空 stub 笔记也算。
+
+- 蛋白家族 / 蛋白概念 → `🗂️ Classifications/Q51 蛋白质/NOTES/<Note>/<Note>.md`（同名 folder note）。
+- 跨类实体只留**一篇**，第二类用 `parents:` + `# RELATED NOTES` 表达，不分叉。
+- 先查 **alias 撞名**，不只查文件名：`NLR` 已被免疫学那篇占走 → 新笔记叫 `Plant NLR`，并在摘要里写明区别。
+- 每条引用先查证再落笔（题名 + 年 + 卷 / 文章号），查不到就写 TBD；密度要具体（PDB ID + 分辨率 + 链组成、基因数、物种名）。
+
+```bash
+python3 scripts/verify_note.py "<note path>" --vault "<vault root>"
+# Hermes 自带解释器没有 PyYAML 时：
+uv run --quiet --with pyyaml python3 scripts/verify_note.py "<note path>" --vault "<vault root>"
+```
+
+脚本报 frontmatter 键、`#` 小节表、行数、以及解析不到的 `[[wikilink]]`；干净时打印 `RESULT: OK`，
+退出码 1 = frontmatter 不可解析或有断链。
+
+## skills/obsidian-howto-notes
+
+**工具 how-to / 文档笔记**（安装、配置、维护，或同一结果的多条路线）的骨架与提交规范，
+同为 bundled `obsidian` 的配套。触发：「把具体的步骤记录到 Obsidian」、按用户给的骨架「重新组织你的笔记」、
+把命令报错与诊断落进笔记。
+
+骨架：每个路线 / 主题一个 `##`，四部分固定顺序——简介（1–2 行）→ `### 安装流程` → `### 维护流程` →
+`### FAQs`（`-` 列表；实测输出、报错文本、机制、坑全放这里，不塞进步骤）。两条硬约束：
+
+- **路径每个 session 重新解析**，写之前与 commit 之前再解析一次：vault 会在同一次任务的两步之间被重组
+  （字母桶 / folder-note 转换），复用记住的路径会静默写出第二份副本。用 `rglob("<Title>*")` 并复用 glob
+  原样打印的字符串（路径带 emoji 与括号，手抄会把 emoji 的变体选择符弄丢）。
+- **证据纪律**：步骤里的命令必须真跑过；推断的机制标注「机制推断，未实测」；事后被实测推翻的那条**就地改写**，
+  不能新旧并列——读者只会读到前一条。
+
+提交时只 add 这一篇笔记的路径（vault 常年处于重组中），复用仓库已有的 message 前缀。
